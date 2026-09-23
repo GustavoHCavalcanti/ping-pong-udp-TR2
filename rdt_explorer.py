@@ -49,6 +49,29 @@ def hello(sock, servidor, grupo):
 
     return tamanho_do_arquivo, cheksum , total_segmentos , tamanho_segmento
 
+def requisitar_segmento(sock, servidor, seq=0):
+    # Envia o pacote REQ
+    pacote = f"REQ|seq={seq}"
+    sock.sendto(pacote.encode("utf-8"), servidor)
+
+    # Recebe a resposta do servidor
+    dados, endereco = sock.recvfrom(65507)
+
+    #Exemplo: DATA|seq=0|total=512|<payload>
+    # índices do 1º, 2º e 3º separador "|"
+    idx1 = dados.find(b"|")
+    idx2 = dados.find(b"|", idx1 + 1)
+    idx3 = dados.find(b"|", idx2 + 1)
+    
+    # cabeçalho vai até o caractere logo após o 3º "|"
+    tamanho_cabecalho = idx3 + 1
+    
+    # dados a partir do final do cabeçalho 
+    payload = dados[tamanho_cabecalho:]
+    
+    return payload
+
+
 def main():
     sock = criar_socket()
     servidor = (SERVIDOR, PORTA)
@@ -70,14 +93,27 @@ def main():
         print()
 
         # Passo 2 — HELLO
-        print("[2] PING")
+        print("[2] HELLO")
 
         tamanho_do_arquivo,checksum,total_segmentos,tamanho_segmentos = hello(sock,servidor,grupo)
-        print
         print(f"    Arquivo: small ({tamanho_do_arquivo} = {int(tamanho_do_arquivo/1024)} KB)")
         print(f"    Checksum MD5:: {checksum}")
         print(f"    Total segmentos: {total_segmentos}")
         print(f"    Tamanho segmento: {tamanho_segmentos} bytes")
+        print()
+
+        # Passo 3 — REQ
+        print("[3] REQ")
+        
+        payload = requisitar_segmento(sock, servidor, seq=0)
+        tamanho_payload = len(payload)
+        
+        # Pega os primeiros 8 bytes e formata como hexadecimal
+        primeiros = payload[:8]
+        hex_str = " ".join(f"{b:02x}" for b in primeiros)
+        
+        print(f"    Payload recebido: {tamanho_payload} bytes")
+        print(f"    Primeiros 8 bytes: {hex_str}")
         print()
 
     except socket.timeout:
